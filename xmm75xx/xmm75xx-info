@@ -27,7 +27,7 @@ get_info() {
     OPERATOR=$(echo "AT+COPS?" | atinout - ${DEVICE} - | awk -F [:,] '/\+COPS:/{gsub("\r","",$4); print $4}' | sed 's/\"//g')
   fi
   DISTANCE=$(echo "AT+XMCI=1" | atinout - ${DEVICE} - | awk -F [:,] '/\+XMCI: 4/{gsub(/"/,""); printf "%.2f\n", ($14*78)/1000}')
-  BAND=$(echo "AT+XLEC?" | atinout - ${DEVICE} - | awk -F [:,] '/\+XLEC:/{gsub("\r","",$4); print "B"$6"+B"$7"+B"$8"+B"$9"+B"$10}' | sed -E 's/BBAND_LTE_/B/g; s/\+B0//g')
+  BAND=$(echo "AT+XLEC?" | atinout - ${DEVICE} - | awk -F [:,] '/\+XLEC:/{gsub("\r","",$4); print "B"$6"+B"$7"+B"$8"+B"$9"+B"$10}' | sed -E 's/BBAND_LTE_/B/g; s/\+B0//g; s/B0\+//g; s/B0//g')
   if ! echo "AT+CREG?" | atinout - ${DEVICE} - | awk -F [:,] '/\+CREG:/{gsub("\r","",$4); print $2}' | grep -q 2; then
     echo "AT+CREG=2" | atinout - ${DEVICE} - > /dev/null 2>&1
   fi
