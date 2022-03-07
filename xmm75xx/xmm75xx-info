@@ -7,6 +7,17 @@
 DEVICE="/dev/ttyACM2"
 REFRESH_RATE=1
 
+while getopts i:d: flag; do
+  case "${flag}" in
+    i)
+      REFRESH_RATE=${OPTARG}
+      ;;
+    d)
+      DEVICE=${OPTARG}
+      ;;
+  esac
+done
+
 check_requirements() {
   if ! which atinout | grep -q atinout; then
     not_installed="atinout"
