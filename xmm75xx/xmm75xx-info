@@ -1,0 +1,96 @@
+#!/bin/bash
+
+# Fibocom L850/L860 Network Information
+# version : v1.0.0
+# Author  : Lutfa Ilham
+
+DEVICE="/dev/ttyACM2"
+REFRESH_RATE=1
+
+check_requirements() {
+  if ! which atinout | grep -q atinout; then
+    not_installed="atinout"
+  fi
+  if [[ ! -f /usr/share/modeminfo/mccmnc.dat ]]; then
+    not_installed="${not_installed}, modeminfo"
+  fi
+  if [[ -n ${not_installed} ]]; then
+    echo -e "Requirements needed: ${not_installed}"
+    exit 1
+  fi
+}
+
+get_info() {
+  MODEL=$(echo "AT+CGMM?" | atinout - ${DEVICE} - | awk -F [:,] '/\+CGMM:/{gsub("\r","",$4); print $3}' | sed 's/\"//g')
+  OPERATOR=$(grep $(echo "AT+COPS?" | atinout - ${DEVICE} - | awk -F [:,] '/\+COPS:/{gsub("\r","",$4); print $4}' | sed 's/\"//g') /usr/share/modeminfo/mccmnc.dat | awk -F [\;] '{print $2}')
+  if [[ ${OPERATOR} == "" ]]; then
+    OPERATOR=$(echo "AT+COPS?" | atinout - ${DEVICE} - | awk -F [:,] '/\+COPS:/{gsub("\r","",$4); print $4}' | sed 's/\"//g')
+  fi
+  DISTANCE=$(echo "AT+XMCI=1" | atinout - ${DEVICE} - | awk -F [:,] '/\+XMCI: 4/{gsub(/"/,""); printf "%.2f\n", ($14*78)/1000}')
+  BAND=$(echo "AT+XLEC?" | atinout - ${DEVICE} - | awk -F [:,] '/\+XLEC:/{gsub("\r","",$4); print "B"$6"+B"$7"+B"$8"+B"$9"+B"$10}' | sed -E 's/BBAND_LTE_/B/g; s/\+B0//g')
+  if ! echo "AT+CREG?" | atinout - ${DEVICE} - | awk -F [:,] '/\+CREG:/{gsub("\r","",$4); print $2}' | grep -q 2; then
+    echo "AT+CREG=2" | atinout - ${DEVICE} - > /dev/null 2>&1
+  fi
+  CID=$(echo $((16#$(echo "AT+CREG?" | atinout - ${DEVICE} - | awk -F [:,] '/\+CREG:/{gsub("\r","",$4); print $5}' | sed 's/\"//g'))))
+  SINR=$(echo "AT+XMCI=1" | atinout - ${DEVICE} - | awk -F [:,] '/\+XMCI: 4/{gsub(/"/,""); printf "%.0f\n", $13/4+5}')
+  RSRP=$(echo "AT+RSRP?" | atinout - ${DEVICE} - | awk -F [:,] '/\+RSRP:/{printf "%.0f\n", $4}')
+  RSRQ=$(echo "AT+RSRQ?" | atinout - ${DEVICE} - | awk -F [:,] '/\+RSRQ:/{printf "%.0f\n", $4}')
+  BWDL=$(echo "AT+XLEC?" | atinout - ${DEVICE} - | awk -F [:,] '/\+XLEC:/{gsub("\r","",$4); print $4}')
+  case $BWDL in
+    1)
+      NP=15
+      ;;
+    2)
+      NP=25
+      ;;
+    3)
+      NP=50
+      ;;
+    4)
+      NP=75
+      ;;
+    5)
+      NP=100
+      ;;
+    *)
+      NP=0
+      ;;
+  esac
+  CSQ=$(echo ${RSRP} ${NP} | awk '{printf "%.0f\n", (($1+10*log(12*$2)/log(10))+113)/2}')
+  CSQ_RSSI=$((2 * CSQ - 113))
+  if [ $CSQ -ge 0 -a $CSQ -le 31 ]; then
+    CSQ_PER=$(($CSQ * 100/31))
+  elif [ $CSQ -ge 32 -a $CSQ -le 50 ]; then
+    CSQ_PER="100"
+  else
+    CSQ_PER="0"
+  fi
+  CHIP_TEMP=$(echo "AT+MTSM=1" | atinout - ${DEVICE} - | awk -F[:,] '/\+MTSM:/{print $2}')
+}
+
+print_info() {
+  get_info
+  echo -e "########## Fibocom ${MODEL} ##########"
+  echo -e "Operator\t: ${OPERATOR} (${CSQ_PER}%) ~${DISTANCE} Km"
+  echo -e "LTE Band\t: ${BAND}"
+  echo -e "CID\t\t: ${CID}"
+  echo -e "RSSI\t\t: ${CSQ_RSSI}\tdBm"
+  echo -e "SINR\t\t: ${SINR}\tdB"
+  echo -e "RSRP\t\t: ${RSRP}\tdBm"
+  echo -e "RSRQ\t\t: ${RSRQ}\tdB"
+  echo -e "Temperature\t: ${CHIP_TEMP}\t°C"
+  echo -e "##################################"
+}
+
+loop_print_info() {
+  check_requirements
+  reset
+  while true; do
+    print_info
+    sleep $REFRESH_RATE
+    reset
+  done
+}
+
+loop_print_info
+
