@@ -95,11 +95,10 @@ print_info() {
 
 loop_print_info() {
   check_requirements
-  reset
   while true; do
+    reset
     print_info
     sleep $REFRESH_RATE
-    reset
   done
 }
 
