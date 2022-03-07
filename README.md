@@ -8,7 +8,7 @@
 ```shell
 curl -sLo /usr/bin/xmm75xx-info "https://raw.githubusercontent.com/lutfailham96/diy-modem-tools/main/xmm75xx/xmm75xx-info" && chmod +x /usr/bin/xmm75xx-info
 ```
-### How to use
+#### How to use
 - Execute
 ```
 xmm75xx-info
