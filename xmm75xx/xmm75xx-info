@@ -31,6 +31,36 @@ check_requirements() {
   fi
 }
 
+ch_to_band(){
+  if [ $1 -ge 0 ] && [ $1 -le 599 ]; then
+    SC=B1
+  elif [ $1 -ge 600 ] && [ $1 -le 1199 ]; then
+    SC=B2
+  elif [ $1 -ge 1200 ] && [ $1 -le 1949 ]; then
+    SC=B3
+  elif [ $1 -ge 1950] && [ $1 -le 2399 ]; then
+    SC=B4
+  elif [ $1 -ge 2400] && [ $1 -le 2469 ]; then
+    SC=B5
+  elif [ $1 -ge 2750 ] && [ $1 -le 3449 ]; then
+    SC=B7
+  elif [ $1 -ge 3450 ] && [ $1 -le 3799 ]; then
+    SC=B8
+  elif [ $1 -ge 6150 ] && [ $1 -le 6449 ]; then
+    SC=B2
+  elif [ $1 -ge 9210 ] && [ $1 -le 9659 ]; then
+    SC=B28
+  elif [ $1 -ge 9870 ] && [ $1 -le 9919 ]; then
+    SC=B31
+  elif [ $1 -ge 37750 ] && [ $1 -le 38249 ]; then
+    SC=B38
+  elif [ $1 -ge 38650 ] && [ $1 -le 39649 ]; then
+    SC=B40
+  else
+    SC=B0
+  fi
+}
+
 get_info() {
   MODEL=$(echo "AT+CGMM?" | atinout - ${DEVICE} - | awk -F [:,] '/\+CGMM:/{gsub("\r","",$4); print $3}' | sed 's/\"//g')
   OPERATOR=$(grep $(echo "AT+COPS?" | atinout - ${DEVICE} - | awk -F [:,] '/\+COPS:/{gsub("\r","",$4); print $4}' | sed 's/\"//g') /usr/share/modeminfo/mccmnc.dat | awk -F [\;] '{print $2}')
@@ -38,7 +68,30 @@ get_info() {
     OPERATOR=$(echo "AT+COPS?" | atinout - ${DEVICE} - | awk -F [:,] '/\+COPS:/{gsub("\r","",$4); print $4}' | sed 's/\"//g')
   fi
   DISTANCE=$(echo "AT+XMCI=1" | atinout - ${DEVICE} - | awk -F [:,] '/\+XMCI: 4/{gsub(/"/,""); printf "%.2f\n", ($14*78)/1000}')
-  BAND=$(echo "AT+XLEC?" | atinout - ${DEVICE} - | sed 's/BAND_LTE_/|/g' | awk -F [:\|] '/\+XLEC:/{gsub("\r","",$4); print $3}' | awk -F [:,] '{print "B"$1"+B"$2"+B"$3"+B"$4"+B"$5}' | sed -E 's/\+B0//g; s/B0\+//g; s/B0//g')
+  LTE_Cx=$(echo "AT+XLEC?" | atinout - ${DEVICE} - | awk -F [:,] '/\+XLEC:/{print $3}')
+  LTE_CA=$(($LTE_Cx -1))
+  case $LTE_CA in
+    1)
+      SCx=$(echo "AT+RSRP?" | atinout - ${DEVICE} - | awk -F [:,] '/\+RSRP:/{print $6}')
+      ;;
+    2)
+      SCx=$(echo "AT+RSRP?" | atinout - ${DEVICE} - | awk -F [:,] '/\+RSRP:/{print $6" "$9}')
+      ;;
+    3)
+      SCx=$(echo "AT+RSRP?" | atinout - ${DEVICE} - | awk -F [:,] '/\+RSRP:/{print $6" "$9" "$12}')
+      ;;
+    4)
+      SCx=$(echo "AT+RSRP?" | atinout - ${DEVICE} - | awk -F [:,] '/\+RSRP:/{print $6" "$9" "$12" "$15}')
+      ;;
+  esac
+  # reset value first
+  LTE_CA_BAND=""
+  for sca in $SCx; do
+    ch_to_band $sca
+    LTE_CA_BAND=$LTE_CA_BAND+$SC
+  done
+  LTE_MAIN_BAND=$(echo "AT+XLEC?" | atinout - ${DEVICE} - | sed 's/BAND_LTE_/|/g' | awk -F [:\|] '/\+XLEC:/{gsub("\r","",$4); print $3}' | awk -F [:,] '{print "B"$1}')
+  LTE_BAND=$(echo "${LTE_MAIN_BAND}${LTE_CA_BAND}" | sed -E 's/\+B0//g; s/B0\+//g; s/B0//g')
   if ! echo "AT+CREG?" | atinout - ${DEVICE} - | awk -F [:,] '/\+CREG:/{gsub("\r","",$4); print $2}' | grep -q 2; then
     echo "AT+CREG=2" | atinout - ${DEVICE} - > /dev/null 2>&1
   fi
@@ -83,7 +136,7 @@ print_info() {
   get_info
   echo -e "########## Fibocom ${MODEL} ##########"
   echo -e "Operator\t: ${OPERATOR} (${CSQ_PER}%) ~${DISTANCE} Km"
-  echo -e "LTE Band\t: ${BAND}"
+  echo -e "LTE Band\t: ${LTE_BAND}"
   echo -e "CID\t\t: ${CID}"
   echo -e "RSSI\t\t: ${CSQ_RSSI}\tdBm"
   echo -e "SINR\t\t: ${SINR}\tdB"
@@ -103,4 +156,3 @@ loop_print_info() {
 }
 
 loop_print_info
-
