@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Fibocom L850/L860 Network Information
-# version : v1.0.0
+# version : v1.1.0
 # Author  : Lutfa Ilham
 
 DEVICE="/dev/ttyACM2"
@@ -19,11 +19,8 @@ while getopts i:d: flag; do
 done
 
 check_requirements() {
-  if ! which atinout | grep -q atinout; then
+  if ! which atinout; then
     not_installed="atinout"
-  fi
-  if [[ ! -f /usr/share/modeminfo/mccmnc.dat ]]; then
-    not_installed="${not_installed}, modeminfo"
   fi
   if [[ -n ${not_installed} ]]; then
     echo -e "Requirements needed: ${not_installed}"
@@ -31,7 +28,11 @@ check_requirements() {
   fi
 }
 
-ch_to_band(){
+at_modem() {
+  echo "${1}" | atinout - ${DEVICE} -
+}
+
+ch_to_band() {
   if [ $1 -ge 0 ] && [ $1 -le 599 ]; then
     SC=B1
   elif [ $1 -ge 600 ] && [ $1 -le 1199 ]; then
@@ -62,26 +63,28 @@ ch_to_band(){
 }
 
 get_info() {
-  MODEL=$(echo "AT+CGMM?" | atinout - ${DEVICE} - | awk -F [:,] '/\+CGMM:/{gsub("\r","",$4); print $3}' | sed 's/\"//g')
-  OPERATOR=$(grep $(echo "AT+COPS?" | atinout - ${DEVICE} - | awk -F [:,] '/\+COPS:/{gsub("\r","",$4); print $4}' | sed 's/\"//g') /usr/share/modeminfo/mccmnc.dat | awk -F [\;] '{print $2}')
-  if [[ ${OPERATOR} == "" ]]; then
-    OPERATOR=$(echo "AT+COPS?" | atinout - ${DEVICE} - | awk -F [:,] '/\+COPS:/{gsub("\r","",$4); print $4}' | sed 's/\"//g')
+  MODEL=$(at_modem "AT+CGMM?" | awk -F [:,] '/\+CGMM:/{gsub("\r",""); gsub("\"",""); print $3}')
+  OPERATOR_CODE=$(at_modem "AT+COPS?" | awk -F [:,] '/\+COPS:/{gsub("\r",""); gsub("\"", ""); print $4}')
+  OPERATOR=$(at_modem "AT+COPN" | grep "${OPERATOR_CODE}" | awk -F [:,] '/\+COPN:/{gsub("\r",""); gsub("\"",""); print $3}')
+  if [[ -z ${OPERATOR} ]]; then
+    OPERATOR=${OPERATOR_CODE}
   fi
-  DISTANCE=$(echo "AT+XMCI=1" | atinout - ${DEVICE} - | awk -F [:,] '/\+XMCI: 4/{gsub(/"/,""); printf "%.2f\n", ($14*78)/1000}')
-  LTE_Cx=$(echo "AT+XLEC?" | atinout - ${DEVICE} - | awk -F [:,] '/\+XLEC:/{print $3}')
+  DISTANCE=$(at_modem "AT+XMCI=1" | awk -F [:,] '/\+XMCI: 4/{gsub(/"/,""); printf "%.2f\n", ($14*78)/1000}')
+  LTE_MAIN_BAND=$(at-modem at+xlec? | awk -F [:_] '/\+XLEC/{gsub("\r",""); print $4}' | awk -F [:,] '{print "B"$1}')
+  LTE_Cx=$(at_modem "AT+XLEC?" | awk -F [:,] '/\+XLEC:/{print $3}')
   LTE_CA=$(($LTE_Cx -1))
   case $LTE_CA in
     1)
-      SCx=$(echo "AT+RSRP?" | atinout - ${DEVICE} - | awk -F [:,] '/\+RSRP:/{print $6}')
+      SCx=$(at_modem "AT+RSRP?" | awk -F [:,] '/\+RSRP:/{print $6}')
       ;;
     2)
-      SCx=$(echo "AT+RSRP?" | atinout - ${DEVICE} - | awk -F [:,] '/\+RSRP:/{print $6" "$9}')
+      SCx=$(at_modem "AT+RSRP?" | awk -F [:,] '/\+RSRP:/{print $6" "$9}')
       ;;
     3)
-      SCx=$(echo "AT+RSRP?" | atinout - ${DEVICE} - | awk -F [:,] '/\+RSRP:/{print $6" "$9" "$12}')
+      SCx=$(at_modem | "AT+RSRP?" | awk -F [:,] '/\+RSRP:/{print $6" "$9" "$12}')
       ;;
     4)
-      SCx=$(echo "AT+RSRP?" | atinout - ${DEVICE} - | awk -F [:,] '/\+RSRP:/{print $6" "$9" "$12" "$15}')
+      SCx=$(at_modem "AT+RSRP?" | awk -F [:,] '/\+RSRP:/{print $6" "$9" "$12" "$15}')
       ;;
   esac
   # reset value first
@@ -90,16 +93,15 @@ get_info() {
     ch_to_band $sca
     LTE_CA_BAND=$LTE_CA_BAND+$SC
   done
-  LTE_MAIN_BAND=$(echo "AT+XLEC?" | atinout - ${DEVICE} - | sed 's/BAND_LTE_/|/g' | awk -F [:\|] '/\+XLEC:/{gsub("\r","",$4); print $3}' | awk -F [:,] '{print "B"$1}')
-  LTE_BAND=$(echo "${LTE_MAIN_BAND}${LTE_CA_BAND}" | sed -E 's/\+B0//g; s/B0\+//g; s/B0//g')
-  if ! echo "AT+CREG?" | atinout - ${DEVICE} - | awk -F [:,] '/\+CREG:/{gsub("\r","",$4); print $2}' | grep -q 2; then
-    echo "AT+CREG=2" | atinout - ${DEVICE} - > /dev/null 2>&1
+  LTE_BAND=$(echo "${LTE_MAIN_BAND}${LTE_CA_BAND}")
+  if ! at_modem "AT+CREG?" | awk -F [:,] '/\+CREG:/{gsub("\r",""); print $2}' | grep -q 2; then
+    at_modem "AT+CREG=2" > /dev/null 2>&1
   fi
-  CID=$(echo $((16#$(echo "AT+CREG?" | atinout - ${DEVICE} - | awk -F [:,] '/\+CREG:/{gsub("\r","",$4); print $5}' | sed 's/\"//g'))))
-  SINR=$(echo "AT+XMCI=1" | atinout - ${DEVICE} - | awk -F [:,] '/\+XMCI: 4/{gsub(/"/,""); printf "%.0f\n", $13/4+5}')
-  RSRP=$(echo "AT+RSRP?" | atinout - ${DEVICE} - | awk -F [:,] '/\+RSRP:/{printf "%.0f\n", $4}')
-  RSRQ=$(echo "AT+RSRQ?" | atinout - ${DEVICE} - | awk -F [:,] '/\+RSRQ:/{printf "%.0f\n", $4}')
-  BWDL=$(echo "AT+XLEC?" | atinout - ${DEVICE} - | awk -F [:,] '/\+XLEC:/{gsub("\r","",$4); print $4}')
+  CID=$(echo $((16#$(at_modem "AT+CREG?" | awk -F [:,] '/\+CREG:/{gsub("\r",""); gsub("\"",""); print $5}'))))
+  SINR=$(at_modem "AT+XMCI=1" | awk -F [:,] '/\+XMCI: 4/{gsub(/"/,""); printf "%.0f\n", $13/4+5}')
+  RSRP=$(at_modem "AT+RSRP?" | awk -F [:,] '/\+RSRP:/{printf "%.0f\n", $4}')
+  RSRQ=$(at_modem "AT+RSRQ?" | awk -F [:,] '/\+RSRQ:/{printf "%.0f\n", $4}')
+  BWDL=$(at_modem "AT+XLEC?" | awk -F [:,] '/\+XLEC:/{gsub("\r",""); print $4}')
   case $BWDL in
     1)
       NP=15
@@ -129,7 +131,7 @@ get_info() {
   else
     CSQ_PER="0"
   fi
-  CHIP_TEMP=$(echo "AT+MTSM=1" | atinout - ${DEVICE} - | awk -F[:,] '/\+MTSM:/{print $2}')
+  CHIP_TEMP=$(at_modem "AT+MTSM=1" | awk -F[:,] '/\+MTSM:/{print $2}')
 }
 
 print_info() {
