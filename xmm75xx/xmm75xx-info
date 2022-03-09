@@ -131,7 +131,8 @@ get_info() {
   else
     CSQ_PER="0"
   fi
-  CHIP_TEMP=$(at_modem "AT+MTSM=1" | awk -F[:,] '/\+MTSM:/{print $2}')
+  CHIP_TEMP=$(at_modem "AT+MTSM=1" | awk -F[:,] '/\+MTSM:/{gsub(" ",""); print $2}')
+  IP_ADDRESS=$(at-modem AT+CGPADDR | awk -F [,] '/^\+CGPADDR/{gsub("\"|\r",""); print $2}'| sed 's/[[:space:]]//g')
 }
 
 print_info() {
@@ -145,6 +146,7 @@ print_info() {
   echo -e "RSRP\t\t: ${RSRP}\tdBm"
   echo -e "RSRQ\t\t: ${RSRQ}\tdB"
   echo -e "Temperature\t: ${CHIP_TEMP}\t°C"
+  echo -e "IP\t\t:" ${IP_ADDRESS}
   echo -e "##################################"
 }
 
