@@ -1,0 +1,24 @@
+#!/bin/bash
+
+# AT Modem Wrapper
+# version : v1.0.0
+# Author  : Lutfa Ilham
+
+DEVICE=/dev/ttyACM2
+AT_COMMAND="${1}"
+
+while getopts d: flag; do
+  case "${flag}" in
+    d)
+      DEVICE=${OPTARG}
+      AT_COMMAND="${3}"
+      ;;
+  esac
+done
+
+! which atinout | grep -q atinout && echo -e "atinout not installed" && exit 1
+
+[[ -z "${1}" ]] && echo -e "No AT command specified." && exit 1
+
+echo "${AT_COMMAND}" | atinout - ${DEVICE} -
+
