@@ -70,7 +70,7 @@ get_info() {
     OPERATOR=${OPERATOR_CODE}
   fi
   DISTANCE=$(at_modem "AT+XMCI=1" | awk -F [:,] '/\+XMCI: 4/{gsub(/"/,""); printf "%.2f\n", ($14*78)/1000}')
-  LTE_MAIN_BAND=$(at-modem at+xlec? | awk -F [:_] '/\+XLEC/{gsub("\r",""); print $4}' | awk -F [:,] '{print "B"$1}')
+  LTE_MAIN_BAND=$(at-modem "AT+XLEC?" | awk -F [:_] '/\+XLEC:/{gsub("\r",""); print $4}' | awk -F [:,] '{print "B"$1}')
   LTE_Cx=$(at_modem "AT+XLEC?" | awk -F [:,] '/\+XLEC:/{print $3}')
   LTE_CA=$(($LTE_Cx -1))
   case $LTE_CA in
@@ -132,7 +132,7 @@ get_info() {
     CSQ_PER="0"
   fi
   CHIP_TEMP=$(at_modem "AT+MTSM=1" | awk -F[:,] '/\+MTSM:/{gsub(" ",""); print $2}')
-  IP_ADDRESS=$(at-modem AT+CGPADDR | awk -F [,] '/^\+CGPADDR/{gsub("\"|\r",""); print $2}'| sed 's/[[:space:]]//g')
+  IP_ADDRESS=$(at-modem AT+CGPADDR | awk -F [,] '/^\+CGPADDR:/{gsub("\"|\r",""); print $2}'| sed 's/[[:space:]]//g')
 }
 
 print_info() {
@@ -160,3 +160,4 @@ loop_print_info() {
 }
 
 loop_print_info
+
