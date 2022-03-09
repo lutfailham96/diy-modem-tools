@@ -64,7 +64,7 @@ ch_to_band() {
 
 get_info() {
   MODEL=$(at_modem "AT+CGMM?" | awk -F [:,] '/\+CGMM:/{gsub("\r",""); gsub("\"",""); print $3}')
-  OPERATOR_CODE=$(at_modem "AT+COPS?" | awk -F [:,] '/\+COPS:/{gsub("\r",""); gsub("\"", ""); print $4}')
+  OPERATOR_CODE=$(at_modem "AT+COPS=3,2;+COPS?" | awk -F [:,] '/\+COPS:/{gsub("\r",""); gsub("\"", ""); print $4}')
   OPERATOR=$(at_modem "AT+COPN" | grep "\"${OPERATOR_CODE}\"" | awk -F [:,] '/\+COPN:/{gsub("\r",""); gsub("\"",""); print $3}')
   if [[ -z ${OPERATOR} ]]; then
     OPERATOR=${OPERATOR_CODE}
