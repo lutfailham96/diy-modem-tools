@@ -76,24 +76,53 @@ get_info() {
   case $LTE_CA in
     1)
       SCx=$(at_modem "AT+RSRP?" | awk -F [:,] '/\+RSRP:/{print $6}')
+      BWCx=$(at_modem "AT+XLEC?" | awk -F [:,] '/\+XLEC:/{gsub("\r",""); print $4" "$5}')
       ;;
     2)
       SCx=$(at_modem "AT+RSRP?" | awk -F [:,] '/\+RSRP:/{print $6" "$9}')
+      BWCx=$(at_modem "AT+XLEC?" | awk -F [:,] '/\+XLEC:/{gsub("\r",""); print $4" "$5" "$6}')
       ;;
     3)
       SCx=$(at_modem | "AT+RSRP?" | awk -F [:,] '/\+RSRP:/{print $6" "$9" "$12}')
+      BWCx=$(at_modem "AT+XLEC?" | awk -F [:,] '/\+XLEC:/{gsub("\r",""); print $4" "$5" "$6" "$7}')
       ;;
     4)
       SCx=$(at_modem "AT+RSRP?" | awk -F [:,] '/\+RSRP:/{print $6" "$9" "$12" "$15}')
+      BWCx=$(at_modem "AT+XLEC?" | awk -F [:,] '/\+XLEC:/{gsub("\r",""); print $4" "$5" "$6" "$7" "$8}')
       ;;
   esac
   # reset value first
   LTE_CA_BAND=""
+  BWCA=0
+  for ca in $BWCx; do
+    case $ca in
+      1)
+        N=3
+        ;;
+      2)
+        N=5
+        ;;
+      3)
+        N=10
+        ;;
+      4)
+        N=15
+        ;;
+      5)
+        N=20
+        ;;
+      *)
+        N=0
+        ;;
+    esac
+    BWCA=$(($BWCA+$N))
+  done
+  [[ ${BWCA} -gt 0 ]] && BWCA="(${BWCA} MHz)" || BWCA=""
   for sca in $SCx; do
-    ch_to_band $sca
+    ch_to_band $sca 2> /dev/null
     LTE_CA_BAND=$LTE_CA_BAND+$SC
   done
-  LTE_BAND=$(echo "${LTE_MAIN_BAND}${LTE_CA_BAND}")
+  LTE_BAND="${LTE_MAIN_BAND}${LTE_CA_BAND}"
   if ! at_modem "AT+CREG?" | awk -F [:,] '/\+CREG:/{gsub("\r",""); print $2}' | grep -q 2; then
     at_modem "AT+CREG=2" > /dev/null 2>&1
   fi
@@ -132,19 +161,19 @@ get_info() {
     CSQ_PER="0"
   fi
   CHIP_TEMP=$(at_modem "AT+MTSM=1" | awk -F[:,] '/\+MTSM:/{gsub(" ",""); print $2}')
-  IP_ADDRESS=$(at-modem AT+CGPADDR | awk -F [,] '/^\+CGPADDR:/{gsub("\"|\r",""); print $2}'| sed 's/[[:space:]]//g')
+  IP_ADDRESS=$(at-modem AT+CGPADDR | awk -F [,] '/^\+CGPADDR: 1/{gsub("\"|\r",""); print $2}'| sed 's/[[:space:]]//g')
 }
 
 print_info() {
   get_info
   echo -e "########## Fibocom ${MODEL} ##########"
   echo -e "Operator\t: ${OPERATOR} (${CSQ_PER}%) ~${DISTANCE} Km"
-  echo -e "LTE Band\t: ${LTE_BAND}"
+  echo -e "LTE Band\t: ${LTE_BAND} ${BWCA}"
   echo -e "CID\t\t: ${CID}"
   echo -e "RSSI\t\t: ${CSQ_RSSI}\tdBm"
-  echo -e "SINR\t\t: ${SINR}\tdB"
-  echo -e "RSRP\t\t: ${RSRP}\tdBm"
-  echo -e "RSRQ\t\t: ${RSRQ}\tdB"
+  echo -e "SINR [DL]\t: ${SINR}\tdB"
+  echo -e "RSRP [UL]\t: ${RSRP}\tdBm"
+  echo -e "RSRQ [WL]\t: ${RSRQ}\tdB"
   echo -e "Temperature\t: ${CHIP_TEMP}\t°C"
   echo -e "IP\t\t:" ${IP_ADDRESS}
   echo -e "##################################"
@@ -160,4 +189,3 @@ loop_print_info() {
 }
 
 loop_print_info
-
