@@ -94,6 +94,7 @@ get_info() {
   # reset value first
   LTE_CA_BAND=""
   BWCA=0
+  BWCA_INFO=""
   for ca in $BWCx; do
     case $ca in
       1)
@@ -116,8 +117,10 @@ get_info() {
         ;;
     esac
     BWCA=$(($BWCA+$N))
+    [[ -z ${BWCA_INFO} ]] && BWCA_INFO="${N}" || BWCA_INFO="${BWCA_INFO}+${N}"
   done
   [[ ${BWCA} -gt 0 ]] && BWCA="(${BWCA} MHz)" || BWCA=""
+  BWCA_INFO="(${BWCA_INFO} MHz)"
   for sca in $SCx; do
     ch_to_band $sca 2> /dev/null
     LTE_CA_BAND=$LTE_CA_BAND+$SC
@@ -166,9 +169,9 @@ get_info() {
 
 print_info() {
   get_info
-  echo -e "########## Fibocom ${MODEL} ##########"
+  echo -e "############### Fibocom ${MODEL} ###############"
   echo -e "Operator\t: ${OPERATOR} (${CSQ_PER}%) ~${DISTANCE} Km"
-  echo -e "LTE Band\t: ${LTE_BAND} ${BWCA}"
+  echo -e "LTE Band\t: ${LTE_BAND} ${BWCA_INFO}"
   echo -e "CID\t\t: ${CID}"
   echo -e "RSSI\t\t: ${CSQ_RSSI}\tdBm"
   echo -e "SINR [DL]\t: ${SINR}\tdB"
@@ -176,7 +179,7 @@ print_info() {
   echo -e "RSRQ [WL]\t: ${RSRQ}\tdB"
   echo -e "Temperature\t: ${CHIP_TEMP}\t°C"
   echo -e "IP\t\t:" ${IP_ADDRESS}
-  echo -e "##################################"
+  echo -e "############################################"
 }
 
 loop_print_info() {
