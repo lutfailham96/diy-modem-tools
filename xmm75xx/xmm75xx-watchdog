@@ -1,0 +1,37 @@
+#!/bin/bash
+
+# Fibocom L850/L860 Connection Watchdog
+# version : v1.0.0
+# Author  : Lutfa Ilham
+
+INTERVAL=3
+NETWORK_DEVICE=$(uci -q get xmm-modem.@xmm-modem[0].device)
+NETWORK_INTERFACE=$(uci -q get xmm-modem.@xmm-modem[0].interface)
+
+while true; do
+  CONNECTION_STATUS=$(uci -q get xmm-modem.@xmm-modem[0].connection_status)
+  if [[ ${CONNECTION_STATUS} -eq 1 ]]; then
+    echo -e "Reconnecting connection already in progress..."
+    sleep ${INTERVAL}
+    continue
+  fi
+  if ip link show ${NETWORK_DEVICE} | grep -q "state UP"; then
+    if [[ ${CONNECTION_STATUS} -eq 1 ]]; then
+      uci -q set xmm-modem.@xmm-modem[0].connection_status='0'
+      uci commit xmm-modem
+    fi
+    echo -e "Already connected, skipping. continuing listener..."
+    sleep ${INTERVAL}
+    continue
+  fi
+  if ip link show ${NETWORK_DEVICE} | grep -q "state DOWN"; then
+    echo -e "[$(date '+%Y-%m-%d %H:%M:%S')] Reconnecting..."
+    /sbin/ifdown ${NETWORK_INTERFACE}
+    sleep 3
+    /sbin/ifup ${NETWORK_INTERFACE}
+    uci -q set xmm-modem.@xmm-modem[0].connection_status='1'
+    uci commit xmm-modem
+    sleep ${INTERVAL}
+  fi
+done
+
