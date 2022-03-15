@@ -13,6 +13,10 @@ while true; do
   if [[ ${CONNECTION_STATUS} -eq 1 ]]; then
     echo -e "Reconnecting connection already in progress..."
     sleep ${INTERVAL}
+    if ip link show ${NETWORK_DEVICE} | grep -q "state UP"; then
+      uci -q set xmm-modem.@xmm-modem[0].connection_status='0'
+      uci commit xmm-modem
+    fi
     continue
   fi
   if ip link show ${NETWORK_DEVICE} | grep -q "state UP"; then
