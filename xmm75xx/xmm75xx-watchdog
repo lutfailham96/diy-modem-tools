@@ -20,7 +20,7 @@ while true; do
       uci -q set xmm-modem.@xmm-modem[0].connection_status='0'
       uci commit xmm-modem
     fi
-    echo -e "Already connected, skipping. continuing listener..."
+    echo -e "Already connected, continuing listener..."
     sleep ${INTERVAL}
     continue
   fi
