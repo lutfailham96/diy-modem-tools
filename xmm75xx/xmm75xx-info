@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Fibocom L850/L860 Network Information
-# version : v1.1.0
+# version : v1.1.1
 # Author  : Lutfa Ilham
 
 DEVICE="/dev/ttyACM2"
@@ -70,7 +70,7 @@ get_info() {
     OPERATOR=${OPERATOR_CODE}
   fi
   DISTANCE=$(at_modem "AT+XMCI=1" | awk -F [:,] '/\+XMCI: 4/{gsub(/"/,""); printf "%.2f\n", ($14*78)/1000}')
-  LTE_MAIN_BAND=$(at-modem "AT+XLEC?" | awk -F [:_] '/\+XLEC:/{gsub("\r",""); print $4}' | awk -F [:,] '{print "B"$1}')
+  LTE_MAIN_BAND=$(at_modem "AT+XLEC?" | awk -F [:_] '/\+XLEC:/{gsub("\r",""); print $4}' | awk -F [:,] '{print "B"$1}')
   LTE_Cx=$(at_modem "AT+XLEC?" | awk -F [:,] '/\+XLEC:/{print $3}')
   LTE_CA=$(($LTE_Cx -1))
   case $LTE_CA in
@@ -163,8 +163,10 @@ get_info() {
   else
     CSQ_PER="0"
   fi
-  CHIP_TEMP=$(at_modem "AT+MTSM=1" | awk -F[:,] '/\+MTSM:/{gsub(" ",""); print $2}')
-  IP_ADDRESS=$(at-modem AT+CGPADDR | awk -F [,] '/^\+CGPADDR: 1/{gsub("\"|\r",""); print $2}'| sed 's/[[:space:]]//g')
+  CHIP_TEMP=$(at_modem "AT+MTSM=1" | awk -F [:,] '/\+MTSM:/{gsub(" ",""); print $2}')
+  IP_ADDRESS=$(at_modem AT+CGPADDR | awk -F [,] '/^\+CGPADDR: 1/{gsub("\"|\r",""); print $2}'| sed 's/[[:space:]]//g')
+  IMEI=$(at_modem "AT+CGSN" | awk '{if(NR==2) print $0}')
+  IMSI=$(at_modem "AT+CIMI" | awk '{if(NR==2) print $0}')
 }
 
 print_info() {
@@ -177,8 +179,10 @@ print_info() {
   echo -e "SINR [DL]\t: ${SINR}\tdB"
   echo -e "RSRP [UL]\t: ${RSRP}\tdBm"
   echo -e "RSRQ [WL]\t: ${RSRQ}\tdB"
-  echo -e "Temperature\t: ${CHIP_TEMP}\t°C"
+  echo -e "IMEI\t\t: ${IMEI}"
+  echo -e "IMSI\t\t: ${IMSI}"
   echo -e "IP\t\t:" ${IP_ADDRESS}
+  echo -e "Temperature\t: ${CHIP_TEMP}\t°C"
   echo -e "############################################"
 }
 
