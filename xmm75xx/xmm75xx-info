@@ -63,6 +63,7 @@ ch_to_band() {
 }
 
 get_info() {
+  INITIALIZE=$(at_modem "ATE0")
   MODEL=$(at_modem "AT+CGMM?" | awk -F [:,] '/\+CGMM:/{gsub("\r",""); gsub("\"",""); print $3}')
   OPERATOR_CODE=$(at_modem "AT+COPS=3,2;+COPS?" | awk -F [:,] '/\+COPS:/{gsub("\r",""); gsub("\"", ""); print $4}')
   OPERATOR=$(at_modem "AT+COPN" | grep "\"${OPERATOR_CODE}\"" | awk -F [:,] '/\+COPN:/{gsub("\r",""); gsub("\"",""); print $3}')
@@ -167,6 +168,7 @@ get_info() {
   IP_ADDRESS=$(at_modem AT+CGPADDR | awk -F [,] '/^\+CGPADDR: 1/{gsub("\"|\r",""); print $2}'| sed 's/[[:space:]]//g')
   IMEI=$(at_modem "AT+CGSN" | awk '{if(NR==2) print $0}')
   IMSI=$(at_modem "AT+CIMI" | awk '{if(NR==2) print $0}')
+  [[ -z ${IMSI} ]] && IMSI="SIM not detected"
 }
 
 print_info() {
